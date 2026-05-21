@@ -140,7 +140,7 @@ class Handler(BaseHTTPRequestHandler):
                 "aspect_ratio": "9:16",
                 "mode": "std"
             }).encode()
-            url = "https://api.klingai.com/v1/videos/image2video"
+            url = "https://api-singapore.klingai.com/v1/videos/image2video"
         else:
             body = json.dumps({
                 "model_name": "kling-v1",
@@ -149,7 +149,7 @@ class Handler(BaseHTTPRequestHandler):
                 "aspect_ratio": "9:16",
                 "mode": "std"
             }).encode()
-            url = "https://api.klingai.com/v1/videos/text2video"
+            url = "https://api-singapore.klingai.com/v1/videos/text2video"
 
         ctx = ssl.create_default_context()
         req = urllib.request.Request(
@@ -178,7 +178,7 @@ class Handler(BaseHTTPRequestHandler):
 
             # Try image2video first, then text2video
             for endpoint in ["image2video", "text2video"]:
-                url = f"https://api.klingai.com/v1/videos/{endpoint}/{task_id}"
+                url = f"https://api-singapore.klingai.com/v1/videos/{endpoint}/{task_id}"
                 try:
                     req = urllib.request.Request(
                         url,
