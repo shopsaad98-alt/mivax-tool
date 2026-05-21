@@ -185,24 +185,20 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
   <p id="icount" style="font-size:.82rem;color:var(--mut);margin-top:8px"></p>
 </div>
 
-<button class="bm" id="mainBtn" onclick="runAll()">🚀 توليد الصوت + الفيديو</button>
+<button class="bm" id="mainBtn" onclick="runAll()">🚀 توليد السكريبت + الصوت</button>
 
 <div class="prog card" id="prog">
   <div class="ct">جاري المعالجة</div>
   <div class="stp" id="s1"><div class="si">1</div><span>توليد الصوت عبر ElevenLabs</span></div>
   <div class="stp" id="s2"><div class="si">2</div><span>تحضير الصور</span></div>
-  <div class="stp" id="s3"><div class="si">3</div><span>تحميل FFmpeg</span></div>
-  <div class="stp" id="s4"><div class="si">4</div><span>تركيب الفيديو MP4</span></div>
+  <div class="stp" id="s3"><div class="si">3</div><span>تجهيز الملفات</span></div>
+  <div class="stp" id="s4"><div class="si">4</div><span>جاهز للتحميل</span></div>
   <div class="ffl" id="ffl"></div>
 </div>
 
 <div class="res card" id="res">
   <div class="ct">✅ جاهز للتحميل</div>
-  <div class="rs" id="vSec" style="display:none">
-    <div class="rt">الفيديو MP4</div>
-    <video id="vEl" controls playsinline></video>
-    <div class="dlr"><a id="vDl" class="db p" download>⬇️ تحميل MP4</a></div>
-  </div>
+
   <div class="rs">
     <div class="rt">الصوت MP3</div>
     <audio id="aEl" controls></audio>
@@ -218,8 +214,7 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 <footer>MIVAX Video Tool — صنع بـ ❤️ لـ Ali Boukhbiz</footer>
 </div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js" crossorigin="anonymous"></script>
+
 <script>
 let selT='ugc', imgs=[], ffInst=null;
 
@@ -371,13 +366,12 @@ async function buildVideo(imgBlobs,audioBlob){
 
 async function runAll(){
   const script=document.getElementById('scriptT').value.trim();
-  if(!script){alert('السكريبت فارغ');return;}
+  if(!script){alert('السكريبت فارغ — ولّده أو اكتبه يدوياً');return;}
   if(!document.getElementById('elKey').value.trim()){alert('خاصك تدخل ElevenLabs API Key');return;}
   const btn=document.getElementById('mainBtn');
-  btn.disabled=true;btn.textContent='⏳ جاري المعالجة...';
+  btn.disabled=true;btn.textContent='⏳ جاري التوليد...';
   document.getElementById('prog').classList.add('show');
   document.getElementById('res').classList.remove('show');
-  document.getElementById('ffl').innerHTML='';
   ['s1','s2','s3','s4'].forEach(s=>step(s,''));
   try{
     step('s1','active');
@@ -387,26 +381,10 @@ async function runAll(){
     document.getElementById('aEl').src=aUrl;
     document.getElementById('aEl').load();
     document.getElementById('aDl').href=aUrl;
-    step('s2','active');
-    const iBlobs=imgs.length>0?imgs.map(f=>new Blob([f],{type:f.type})):[];
+    document.getElementById('aDl').download='mivax_audio_'+Date.now()+'.mp3';
     step('s2','done');
-    if(iBlobs.length>0){
-      step('s3','active');
-      await loadFF();
-      step('s3','done');
-      step('s4','active');
-      const vBlob=await buildVideo(iBlobs,aBlob);
-      step('s4','done');
-      const vUrl=URL.createObjectURL(vBlob);
-      document.getElementById('vEl').src=vUrl;
-      const pn=document.getElementById('pName').value.replace(/\s+/g,'_');
-      document.getElementById('vDl').href=vUrl;
-      document.getElementById('vDl').download=`MIVAX_${pn}_${Date.now()}.mp4`;
-      document.getElementById('vSec').style.display='block';
-    }else{
-      step('s3','done');step('s4','done');
-      document.getElementById('vSec').style.display='none';
-    }
+    step('s3','done');
+    step('s4','done');
     document.getElementById('sDis').textContent=script;
     document.getElementById('res').classList.add('show');
   }catch(e){
