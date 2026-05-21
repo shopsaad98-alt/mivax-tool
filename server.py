@@ -12,6 +12,7 @@ import base64
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY", "").strip()
 KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY", "").strip()
+IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY", "").strip()
 PORT = int(os.environ.get("PORT", 8000))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -39,7 +40,7 @@ class Handler(BaseHTTPRequestHandler):
             filepath = os.path.join(BASE_DIR, "index.html")
             self.serve_file(filepath, "text/html; charset=utf-8")
         elif self.path == "/health":
-            self.send_json({"status": "ok", "anthropic": bool(ANTHROPIC_API_KEY), "kling": bool(KLING_ACCESS_KEY)})
+            self.send_json({"status": "ok", "anthropic": bool(ANTHROPIC_API_KEY), "kling": bool(KLING_ACCESS_KEY), "imgbb": bool(IMGBB_API_KEY)})
         elif self.path.startswith("/api/video/status/"):
             task_id = self.path.split("/")[-1]
             self.check_video_status(task_id)
@@ -50,6 +51,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length)
+
+        # Handle image upload (multipart)
+        if self.path == "/api/upload":
+            try:
+                result = self.upload_image(body, self.headers)
+                self.send_json(result)
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
+            return
+
         try:
             data = json.loads(body)
         except:
@@ -78,6 +89,71 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def upload_image(self, body, headers):
+        if not IMGBB_API_KEY:
+            raise Exception("IMGBB_API_KEY غير موجود")
+
+        import email.parser
+        content_type = headers.get("Content-Type", "")
+
+        # Extract boundary
+        boundary = None
+        for part in content_type.split(";"):
+            part = part.strip()
+            if part.startswith("boundary="):
+                boundary = part[9:].strip('"')
+                break
+
+        if not boundary:
+            raise Exception("No boundary in multipart")
+
+        # Parse multipart manually
+        boundary_bytes = ("--" + boundary).encode()
+        parts = body.split(boundary_bytes)
+        image_data = None
+
+        for part in parts:
+            if b"Content-Disposition" in part and b"filename" in part:
+                # Split headers from body
+                if b"
+
+" in part:
+                    _, file_content = part.split(b"
+
+", 1)
+                    file_content = file_content.rstrip(b"
+--")
+                    image_data = file_content
+                    break
+
+        if not image_data:
+            raise Exception("No image found in request")
+
+        # Upload to ImgBB
+        import urllib.parse
+        b64 = base64.b64encode(image_data).decode()
+
+        post_data = urllib.parse.urlencode({
+            "key": IMGBB_API_KEY,
+            "image": b64
+        }).encode()
+
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(
+            "https://api.imgbb.com/1/upload",
+            data=post_data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
+            result = json.loads(resp.read())
+
+        if result.get("success"):
+            return {"url": result["data"]["url"]}
+        else:
+            raise Exception("ImgBB upload failed")
 
     def generate_script(self, data, api_key):
         dialect_map = {
@@ -131,13 +207,15 @@ class Handler(BaseHTTPRequestHandler):
         image_url = data.get("image_url", "")
         duration = data.get("duration", "5")
 
+        aspect_ratio = data.get("aspect_ratio", "9:16")
+
         if image_url:
             body = json.dumps({
                 "model_name": "kling-v1",
                 "image": image_url,
                 "prompt": prompt,
                 "duration": duration,
-                "aspect_ratio": "9:16",
+                "aspect_ratio": aspect_ratio,
                 "mode": "std"
             }).encode()
             url = "https://api-singapore.klingai.com/v1/videos/image2video"
@@ -146,7 +224,7 @@ class Handler(BaseHTTPRequestHandler):
                 "model_name": "kling-v1",
                 "prompt": prompt,
                 "duration": duration,
-                "aspect_ratio": "9:16",
+                "aspect_ratio": aspect_ratio,
                 "mode": "std"
             }).encode()
             url = "https://api-singapore.klingai.com/v1/videos/text2video"
