@@ -167,9 +167,26 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 </div>
 
 <div class="card">
+  <div class="ct">نسبة الأبعاد — المنصة</div>
+  <div class="tg" id="ratioG">
+    <div class="tb on" data-v="9:16"><span class="ic">📱</span>9:16<br><small>TikTok/Reels</small></div>
+    <div class="tb" data-v="1:1"><span class="ic">⬛</span>1:1<br><small>Instagram Feed</small></div>
+    <div class="tb" data-v="16:9"><span class="ic">🖥️</span>16:9<br><small>YouTube/Facebook</small></div>
+    <div class="tb" data-v="4:5"><span class="ic">📸</span>4:5<br><small>Feed أفضل</small></div>
+  </div>
+</div>
+
+<div class="card">
   <div class="ct">السكريبت</div>
   <button class="bm sec" id="genSBtn" onclick="genScript()">✨ توليد السكريبت تلقائياً</button>
   <textarea id="scriptT" dir="rtl" style="min-height:140px" placeholder="السكريبت سيظهر هنا — يمكنك تعديله..."></textarea>
+</div>
+
+<div class="card">
+  <div class="ct">الشخصية — للاتساق بين المقاطع</div>
+  <div class="nt nw">⚡ اكتب وصفاً ثابتاً للشخصية باش تكون نفسها في كل المقاطع</div>
+  <label>وصف الشخصية (بالإنجليزية)</label>
+  <input type="text" id="avatarDesc" placeholder="Young Saudi woman, 28 years old, long black hair, wearing white dress, warm skin tone" value="Young Saudi woman, 28 years old, long black hair, wearing white dress, warm skin tone"/>
 </div>
 
 <div class="card">
@@ -194,13 +211,13 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
     <button class="bm sec" style="margin:0;flex:1" onclick="addVideoPrompt()">+ إضافة مشهد</button>
     <button class="bm sec" style="margin:0;flex:1" onclick="removeVideoPrompt()">− حذف آخر مشهد</button>
   </div>
-  <label>رفع صورة للمنتج (اختياري — لتوليد فيديو من صورة)</label>
-  <input type="file" id="imgUpload" accept="image/*" onchange="previewImg(this)"/>
-  <div class="img-prev" id="imgPreview"></div>
-  <div id="imgUrlBox" style="display:none">
-    <label>رابط الصورة (بعد الرفع)</label>
-    <input type="text" id="imgUrl" placeholder="https://..." readonly/>
+  <label>رفع صورة المنتج (للتوليد من صورة حقيقية)</label>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+    <input type="file" id="imgUpload" accept="image/*" onchange="uploadImg(this)" style="flex:1;margin:0"/>
+    <div id="uploadStatus" style="font-size:.82rem;color:var(--mut)">لم تُرفع صورة</div>
   </div>
+  <div class="img-prev" id="imgPreview"></div>
+  <input type="hidden" id="imgUrl" value=""/>
 </div>
 
 <button class="bm" id="mainBtn" onclick="runAll()">🚀 توليد السكريبت + الصوت + الفيديوهات</button>
@@ -244,7 +261,16 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 
 <script>
 let selT='ugc';
+let selRatio='9:16';
 let uploadedImgUrl='';
+
+document.getElementById('ratioG').addEventListener('click',e=>{
+  const b=e.target.closest('.tb');
+  if(!b)return;
+  document.querySelectorAll('#ratioG .tb').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  selRatio=b.dataset.v;
+});
 
 document.getElementById('typeG').addEventListener('click',e=>{
   const b=e.target.closest('.tb');
@@ -269,13 +295,34 @@ function removeVideoPrompt(){
   if(rows.length>1)rows[rows.length-1].remove();
 }
 
-function previewImg(input){
+async function uploadImg(input){
   if(!input.files[0])return;
   const prev=document.getElementById('imgPreview');
+  const status=document.getElementById('uploadStatus');
   prev.innerHTML='';
+
+  // Preview
   const img=document.createElement('img');
   img.src=URL.createObjectURL(input.files[0]);
   prev.appendChild(img);
+
+  // Upload to server
+  status.textContent='⏳ جاري الرفع...';
+  status.style.color='var(--warn)';
+
+  try{
+    const formData=new FormData();
+    formData.append('image', input.files[0]);
+    const res=await fetch('/api/upload',{method:'POST',body:formData});
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    document.getElementById('imgUrl').value=data.url;
+    status.textContent='✅ تم الرفع';
+    status.style.color='var(--g)';
+  }catch(e){
+    status.textContent='❌ فشل الرفع: '+e.message;
+    status.style.color='var(--err)';
+  }
 }
 
 function step(id,st){
@@ -326,7 +373,7 @@ async function genAudio(script){
 }
 
 async function submitVideo(prompt, duration, imageUrl){
-  const body={prompt, duration};
+  const body={prompt, duration, aspect_ratio:selRatio};
   if(imageUrl)body.image_url=imageUrl;
   const res=await fetch('/api/video',{
     method:'POST',
