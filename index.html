@@ -30,9 +30,6 @@ input[type=password]{letter-spacing:2px}
 .tb:hover{border-color:var(--g);color:var(--txt)}
 .tb.on{border-color:var(--g);background:var(--gdim);color:var(--g);font-weight:700}
 .tb .ic{font-size:1.2rem;display:block;margin-bottom:3px}
-.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
-.tab{padding:7px 14px;border:1px solid var(--brd);border-radius:20px;font-size:.82rem;cursor:pointer;background:var(--bg3);color:var(--mut);transition:all .15s}
-.tab.on{border-color:var(--g);background:var(--gdim);color:var(--g);font-weight:700}
 .bm{width:100%;padding:15px;background:var(--g);color:#031A12;border:none;border-radius:10px;font-family:'Cairo',sans-serif;font-size:1.05rem;font-weight:900;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px}
 .bm:hover:not(:disabled){background:var(--gd);transform:translateY(-1px)}
 .bm:disabled{opacity:.4;cursor:not-allowed;transform:none}
@@ -55,16 +52,12 @@ input[type=password]{letter-spacing:2px}
 .rt{font-size:.8rem;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
 .sb{background:var(--bg3);border:1px solid var(--brd);border-radius:10px;padding:16px;font-size:.95rem;line-height:1.9;white-space:pre-wrap;direction:rtl;max-height:260px;overflow-y:auto}
 audio{width:100%;margin:8px 0}
-video{width:100%;max-width:340px;display:block;margin:10px auto;border-radius:12px;background:#000}
 .dlr{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
 .db{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:1px solid var(--brd);border-radius:8px;font-size:.85rem;background:var(--bg3);color:var(--txt);text-decoration:none;cursor:pointer;transition:all .15s}
 .db:hover{border-color:var(--g);color:var(--g)}
 .db.p{background:var(--g);border-color:var(--g);color:#031A12;font-weight:700}
-.ffl{background:#000;border-radius:8px;padding:10px 12px;font-family:monospace;font-size:.75rem;color:#4ADE80;max-height:100px;overflow-y:auto;display:none;margin-top:8px}
-.ffl.show{display:block}
 .nt{padding:10px 14px;border-radius:8px;font-size:.83rem;margin-bottom:14px;display:flex;gap:8px;align-items:flex-start}
 .ni{background:rgba(0,200,150,.08);border:1px solid rgba(0,200,150,.2);color:#7DFFD0}
-.nw{background:rgba(255,184,48,.08);border:1px solid rgba(255,184,48,.2);color:#FFB830}
 .ig{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
 .ig img{width:100%;border-radius:8px;aspect-ratio:9/16;object-fit:cover}
 footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
@@ -74,7 +67,7 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 <div class="wrap">
 <header>
   <h1>MIVAX <span>Video</span> Tool</h1>
-  <p>سكريبت ← صوت ← فيديو MP4 — كل شيء في مكان واحد</p>
+  <p>سكريبت ← صوت MP3 جاهز للنشر</p>
 </header>
 
 <div class="card">
@@ -176,47 +169,38 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
   <textarea id="scriptT" dir="rtl" style="min-height:140px" placeholder="السكريبت سيظهر هنا — يمكنك تعديله..."></textarea>
 </div>
 
-<div class="card">
-  <div class="ct">صور المنتج</div>
-  <div class="nt ni">📱 أضف 3-6 صور — سيتم دمجها مع الصوت في فيديو MP4</div>
-  <input type="file" id="imgI" multiple accept="image/*" onchange="handleImgs(this)" style="display:none">
-  <button class="bm sec" onclick="document.getElementById('imgI').click()">🖼️ اختيار صور المنتج</button>
-  <div class="ig" id="igrid"></div>
-  <p id="icount" style="font-size:.82rem;color:var(--mut);margin-top:8px"></p>
-</div>
-
-<button class="bm" id="mainBtn" onclick="runAll()">🚀 توليد السكريبت + الصوت</button>
+<button class="bm" id="mainBtn" onclick="runAll()">🎵 توليد الصوت MP3</button>
 
 <div class="prog card" id="prog">
   <div class="ct">جاري المعالجة</div>
   <div class="stp" id="s1"><div class="si">1</div><span>توليد الصوت عبر ElevenLabs</span></div>
-  <div class="stp" id="s2"><div class="si">2</div><span>تحضير الصور</span></div>
-  <div class="stp" id="s3"><div class="si">3</div><span>تجهيز الملفات</span></div>
-  <div class="stp" id="s4"><div class="si">4</div><span>جاهز للتحميل</span></div>
-  <div class="ffl" id="ffl"></div>
+  <div class="stp" id="s2"><div class="si">2</div><span>تجهيز الملف</span></div>
+  <div class="stp" id="s3"><div class="si">3</div><span>جاهز للتحميل</span></div>
 </div>
 
 <div class="res card" id="res">
   <div class="ct">✅ جاهز للتحميل</div>
-
   <div class="rs">
     <div class="rt">الصوت MP3</div>
     <audio id="aEl" controls></audio>
-    <div class="dlr"><a id="aDl" class="db" download="mivax_audio.mp3">⬇️ تحميل MP3</a></div>
+    <div class="dlr">
+      <a id="aDl" class="db p" download="mivax_audio.mp3">⬇️ تحميل MP3</a>
+    </div>
   </div>
   <div class="rs">
     <div class="rt">السكريبت</div>
     <div class="sb" id="sDis"></div>
-    <div class="dlr"><button class="db" onclick="copyS()">📋 نسخ</button></div>
+    <div class="dlr">
+      <button class="db" onclick="copyS()">📋 نسخ السكريبت</button>
+    </div>
   </div>
 </div>
 
 <footer>MIVAX Video Tool — صنع بـ ❤️ لـ Ali Boukhbiz</footer>
 </div>
 
-
 <script>
-let selT='ugc', imgs=[], ffInst=null;
+let selT='ugc';
 
 document.getElementById('typeG').addEventListener('click',e=>{
   const b=e.target.closest('.tb');
@@ -226,18 +210,6 @@ document.getElementById('typeG').addEventListener('click',e=>{
   selT=b.dataset.v;
 });
 
-function handleImgs(inp){
-  imgs=Array.from(inp.files);
-  const g=document.getElementById('igrid');
-  g.innerHTML='';
-  imgs.forEach(f=>{
-    const i=document.createElement('img');
-    i.src=URL.createObjectURL(f);
-    g.appendChild(i);
-  });
-  document.getElementById('icount').textContent=`✓ ${imgs.length} صورة محددة`;
-}
-
 function step(id,st){
   const el=document.getElementById(id);
   el.classList.remove('active','done','err');
@@ -246,13 +218,6 @@ function step(id,st){
   if(st==='active')si.textContent='↻';
   else if(st==='done')si.textContent='✓';
   else if(st==='err')si.textContent='✕';
-}
-
-function flog(m){
-  const el=document.getElementById('ffl');
-  el.classList.add('show');
-  el.innerHTML+=m+'\n';
-  el.scrollTop=el.scrollHeight;
 }
 
 async function genScript(){
@@ -297,73 +262,6 @@ async function genAudio(script){
   return new Blob([buf],{type:'audio/mpeg'});
 }
 
-async function loadFF(){
-  if(ffInst)return ffInst;
-  flog('تحميل FFmpeg...');
-  const{FFmpeg}=FFmpegWASM;
-  ffInst=new FFmpeg();
-  ffInst.on('log',({message})=>{
-    if(message&&(message.includes('time=')||message.includes('frame='))){
-      const lines=document.getElementById('ffl').children;
-      const last=lines[lines.length-1];
-      if(last&&last.textContent.startsWith('🎬'))last.textContent='🎬 '+message;
-      else flog('🎬 '+message);
-    }
-  });
-  const base='https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-  const toBlobURL=async(url,type)=>{
-    const r=await fetch(url,{credentials:'omit'});
-    const b=await r.blob();
-    return URL.createObjectURL(new Blob([await b.arrayBuffer()],{type}));
-  };
-  await ffInst.load({
-    coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
-    wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm'),
-  });
-  flog('✅ FFmpeg جاهز');
-  return ffInst;
-}
-
-async function buildVideo(imgBlobs,audioBlob){
-  const ff=await loadFF();
-  flog('تحميل الملفات...');
-  for(let i=0;i<imgBlobs.length;i++){
-    const buf=new Uint8Array(await imgBlobs[i].arrayBuffer());
-    await ff.writeFile(`i${i}.jpg`,buf);
-  }
-  const ab=new Uint8Array(await audioBlob.arrayBuffer());
-  await ff.writeFile('a.mp3',ab);
-  const aUrl=URL.createObjectURL(audioBlob);
-  const dur=await new Promise(r=>{
-    const a=new Audio(aUrl);
-    a.onloadedmetadata=()=>r(a.duration);
-    a.onerror=()=>r(30);
-    setTimeout(()=>r(30),6000);
-  });
-  const total=Math.max(dur,15);
-  const pi=total/imgBlobs.length;
-  const fps=25,fpi=Math.round(pi*fps);
-  flog(`مدة: ${total.toFixed(1)}s — ${imgBlobs.length} صور`);
-  const inputs=[],filters=[];
-  for(let i=0;i<imgBlobs.length;i++){
-    inputs.push('-loop','1','-t',String(pi),'-i',`i${i}.jpg`);
-    filters.push(`[${i}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(zoom+0.001,1.08)':d=${fpi}:s=1080x1920:fps=${fps}[v${i}]`);
-  }
-  const vi=imgBlobs.map((_,i)=>`[v${i}]`).join('');
-  filters.push(`${vi}concat=n=${imgBlobs.length}:v=1:a=0[outv]`);
-  inputs.push('-i','a.mp3');
-  flog('جاري تركيب الفيديو...');
-  await ff.exec([...inputs,'-filter_complex',filters.join(';'),'-map','[outv]','-map',`${imgBlobs.length}:a`,'-c:v','libx264','-preset','ultrafast','-crf','26','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-shortest','-r',String(fps),'out.mp4']);
-  flog('قراءة الفيديو...');
-  const data=await ff.readFile('out.mp4');
-  const blob=new Blob([data.buffer],{type:'video/mp4'});
-  flog(`✅ ${(blob.size/1024/1024).toFixed(2)} MB`);
-  for(let i=0;i<imgBlobs.length;i++)try{await ff.deleteFile(`i${i}.jpg`);}catch{}
-  try{await ff.deleteFile('a.mp3');}catch{}
-  try{await ff.deleteFile('out.mp4');}catch{}
-  return blob;
-}
-
 async function runAll(){
   const script=document.getElementById('scriptT').value.trim();
   if(!script){alert('السكريبت فارغ — ولّده أو اكتبه يدوياً');return;}
@@ -372,28 +270,28 @@ async function runAll(){
   btn.disabled=true;btn.textContent='⏳ جاري التوليد...';
   document.getElementById('prog').classList.add('show');
   document.getElementById('res').classList.remove('show');
-  ['s1','s2','s3','s4'].forEach(s=>step(s,''));
+  ['s1','s2','s3'].forEach(s=>step(s,''));
   try{
     step('s1','active');
     const aBlob=await genAudio(script);
     step('s1','done');
+    step('s2','active');
     const aUrl=URL.createObjectURL(aBlob);
     document.getElementById('aEl').src=aUrl;
     document.getElementById('aEl').load();
     document.getElementById('aDl').href=aUrl;
-    document.getElementById('aDl').download='mivax_audio_'+Date.now()+'.mp3';
+    document.getElementById('aDl').download='mivax_'+document.getElementById('pName').value.replace(/\s+/g,'_')+'_'+Date.now()+'.mp3';
     step('s2','done');
     step('s3','done');
-    step('s4','done');
     document.getElementById('sDis').textContent=script;
     document.getElementById('res').classList.add('show');
   }catch(e){
-    ['s1','s2','s3','s4'].forEach(s=>{
+    ['s1','s2','s3'].forEach(s=>{
       if(document.getElementById(s).classList.contains('active'))step(s,'err');
     });
     alert('❌ خطأ: '+e.message);
   }
-  btn.disabled=false;btn.textContent='🚀 توليد جديد';
+  btn.disabled=false;btn.textContent='🎵 توليد صوت جديد';
 }
 
 function copyS(){
