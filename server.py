@@ -89,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
 6. السكريبت فقط جاهز للقراءة بدون أي عناوين أو تعليقات"""
 
         req_data = json.dumps({
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-3-5-sonnet-20241022",
             "max_tokens": 1000,
             "messages": [{"role": "user", "content": prompt}]
         }).encode()
@@ -141,4 +141,3 @@ if __name__ == "__main__":
     print(f"Base dir: {BASE_DIR}")
     print(f"API key set: {bool(ANTHROPIC_API_KEY)}")
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
-
