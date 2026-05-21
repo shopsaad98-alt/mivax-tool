@@ -218,8 +218,8 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 <footer>MIVAX Video Tool — صنع بـ ❤️ لـ Ali Boukhbiz</footer>
 </div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js"></script>
-<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js" crossorigin="anonymous"></script>
+<script>window.FFmpegUtil={toBlobURL:async function(url,mimeType){const r=await fetch(url);const b=await r.blob();return URL.createObjectURL(new Blob([await b.arrayBuffer()],{type:mimeType}));}}</script>
 <script>
 let selT='ugc', imgs=[], ffInst=null;
 
