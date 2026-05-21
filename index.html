@@ -6,10 +6,10 @@
 <title>MIVAX — مولد الفيديوهات الإعلانية</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
-:root{--g:#00C896;--gd:#00A07A;--gdim:rgba(0,200,150,.12);--bg:#0A0F0D;--bg2:#111A16;--bg3:#172120;--brd:rgba(0,200,150,.18);--txt:#E8F5F0;--mut:#7A9E92;--err:#FF5C5C}
+:root{--g:#00C896;--gd:#00A07A;--gdim:rgba(0,200,150,.12);--bg:#0A0F0D;--bg2:#111A16;--bg3:#172120;--brd:rgba(0,200,150,.18);--txt:#E8F5F0;--mut:#7A9E92;--err:#FF5C5C;--warn:#FFB830}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding:20px 16px 60px}
-.wrap{max-width:820px;margin:0 auto}
+.wrap{max-width:860px;margin:0 auto}
 header{text-align:center;padding:36px 20px 28px;margin-bottom:28px}
 header::after{content:'';display:block;width:80px;height:2px;background:var(--g);margin:18px auto 0;border-radius:2px}
 header h1{font-size:2rem;font-weight:900}
@@ -35,6 +35,7 @@ input[type=password]{letter-spacing:2px}
 .bm:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .bm.sec{background:transparent;border:1px solid var(--g);color:var(--g)}
 .bm.sec:hover:not(:disabled){background:var(--gdim)}
+.bm.warn{background:var(--warn);color:#1a1a1a}
 .prog{margin-top:16px;display:none}
 .prog.show{display:block}
 .stp{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:.9rem;color:var(--mut);border-bottom:1px solid rgba(255,255,255,.04)}
@@ -58,8 +59,16 @@ audio{width:100%;margin:8px 0}
 .db.p{background:var(--g);border-color:var(--g);color:#031A12;font-weight:700}
 .nt{padding:10px 14px;border-radius:8px;font-size:.83rem;margin-bottom:14px;display:flex;gap:8px;align-items:flex-start}
 .ni{background:rgba(0,200,150,.08);border:1px solid rgba(0,200,150,.2);color:#7DFFD0}
-.ig{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-.ig img{width:100%;border-radius:8px;aspect-ratio:9/16;object-fit:cover}
+.nw{background:rgba(255,184,48,.08);border:1px solid rgba(255,184,48,.3);color:var(--warn)}
+.vid-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+@media(max-width:520px){.vid-grid{grid-template-columns:1fr}}
+.vid-card{background:var(--bg3);border:1px solid var(--brd);border-radius:10px;padding:12px;text-align:center}
+.vid-card video{width:100%;border-radius:8px;max-height:200px}
+.vid-card .vid-status{font-size:.8rem;color:var(--mut);margin:8px 0 4px}
+.vid-card .vid-status.done{color:var(--g)}
+.vid-card .vid-status.err{color:var(--err)}
+.img-prev{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.img-prev img{width:100%;border-radius:8px;aspect-ratio:1;object-fit:cover}
 footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 </style>
 </head>
@@ -67,21 +76,15 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 <div class="wrap">
 <header>
   <h1>MIVAX <span>Video</span> Tool</h1>
-  <p>سكريبت ← صوت MP3 جاهز للنشر</p>
+  <p>سكريبت ← صوت ← فيديوهات Kling AI — كل شيء في مكان واحد</p>
 </header>
 
 <div class="card">
   <div class="ct">مفاتيح API</div>
-  <div class="nt ni">🔒 المفاتيح تشتغل على السيرفر فقط — ما كتتخزنش في أي مكان</div>
-  <div class="r2">
-    <div>
-      <label>ElevenLabs API Key</label>
-      <input type="password" id="elKey" placeholder="sk_..."/>
-    </div>
-    <div>
-      <label>Anthropic API Key (للسكريبت)</label>
-      <input type="password" id="antKey" placeholder="sk-ant-..."/>
-    </div>
+  <div class="nt ni">🔒 ElevenLabs key فقط يُدخل هنا — Anthropic و Kling محفوظين في السيرفر</div>
+  <div>
+    <label>ElevenLabs API Key</label>
+    <input type="password" id="elKey" placeholder="sk_..."/>
   </div>
 </div>
 
@@ -169,17 +172,56 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
   <textarea id="scriptT" dir="rtl" style="min-height:140px" placeholder="السكريبت سيظهر هنا — يمكنك تعديله..."></textarea>
 </div>
 
-<button class="bm" id="mainBtn" onclick="runAll()">🎵 توليد الصوت MP3</button>
+<div class="card">
+  <div class="ct">مقاطع الفيديو — Kling AI</div>
+  <div class="nt nw">⚡ كل مقطع يحتاج 2-3 دقايق للتوليد — يمكنك توليد عدة مقاطع معاً</div>
+  <div id="videoPrompts">
+    <div class="vid-prompt-row" style="display:flex;gap:8px;margin-bottom:10px;align-items:flex-start">
+      <div style="flex:1">
+        <label>وصف المشهد 1 (بالإنجليزية أو العربية)</label>
+        <input type="text" class="vprompt" placeholder="Woman touching her hair, looking happy, natural light, cinematic"/>
+      </div>
+      <div style="width:100px">
+        <label>مدة</label>
+        <select class="vdur">
+          <option value="5">5 ث</option>
+          <option value="10">10 ث</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="bm sec" style="margin:0;flex:1" onclick="addVideoPrompt()">+ إضافة مشهد</button>
+    <button class="bm sec" style="margin:0;flex:1" onclick="removeVideoPrompt()">− حذف آخر مشهد</button>
+  </div>
+  <label>رفع صورة للمنتج (اختياري — لتوليد فيديو من صورة)</label>
+  <input type="file" id="imgUpload" accept="image/*" onchange="previewImg(this)"/>
+  <div class="img-prev" id="imgPreview"></div>
+  <div id="imgUrlBox" style="display:none">
+    <label>رابط الصورة (بعد الرفع)</label>
+    <input type="text" id="imgUrl" placeholder="https://..." readonly/>
+  </div>
+</div>
+
+<button class="bm" id="mainBtn" onclick="runAll()">🚀 توليد السكريبت + الصوت + الفيديوهات</button>
+<button class="bm sec" id="audioOnlyBtn" onclick="runAudioOnly()">🎵 توليد الصوت فقط</button>
 
 <div class="prog card" id="prog">
   <div class="ct">جاري المعالجة</div>
   <div class="stp" id="s1"><div class="si">1</div><span>توليد الصوت عبر ElevenLabs</span></div>
-  <div class="stp" id="s2"><div class="si">2</div><span>تجهيز الملف</span></div>
-  <div class="stp" id="s3"><div class="si">3</div><span>جاهز للتحميل</span></div>
+  <div class="stp" id="s2"><div class="si">2</div><span>إرسال مقاطع الفيديو لـ Kling AI</span></div>
+  <div class="stp" id="s3"><div class="si">3</div><span>انتظار توليد الفيديوهات (2-3 دقايق)</span></div>
+  <div class="stp" id="s4"><div class="si">4</div><span>جاهز للتحميل</span></div>
 </div>
 
 <div class="res card" id="res">
   <div class="ct">✅ جاهز للتحميل</div>
+
+  <div class="rs" id="videoRes" style="display:none">
+    <div class="rt">مقاطع الفيديو</div>
+    <div class="vid-grid" id="vidGrid"></div>
+  </div>
+
   <div class="rs">
     <div class="rt">الصوت MP3</div>
     <audio id="aEl" controls></audio>
@@ -187,6 +229,7 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
       <a id="aDl" class="db p" download="mivax_audio.mp3">⬇️ تحميل MP3</a>
     </div>
   </div>
+
   <div class="rs">
     <div class="rt">السكريبت</div>
     <div class="sb" id="sDis"></div>
@@ -201,6 +244,7 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 
 <script>
 let selT='ugc';
+let uploadedImgUrl='';
 
 document.getElementById('typeG').addEventListener('click',e=>{
   const b=e.target.closest('.tb');
@@ -210,8 +254,33 @@ document.getElementById('typeG').addEventListener('click',e=>{
   selT=b.dataset.v;
 });
 
+function addVideoPrompt(){
+  const n=document.querySelectorAll('.vid-prompt-row').length+1;
+  const d=document.getElementById('videoPrompts');
+  const row=document.createElement('div');
+  row.className='vid-prompt-row';
+  row.style='display:flex;gap:8px;margin-bottom:10px;align-items:flex-start';
+  row.innerHTML=`<div style="flex:1"><label>وصف المشهد ${n}</label><input type="text" class="vprompt" placeholder="Describe scene ${n}..."/></div><div style="width:100px"><label>مدة</label><select class="vdur"><option value="5">5 ث</option><option value="10">10 ث</option></select></div>`;
+  d.appendChild(row);
+}
+
+function removeVideoPrompt(){
+  const rows=document.querySelectorAll('.vid-prompt-row');
+  if(rows.length>1)rows[rows.length-1].remove();
+}
+
+function previewImg(input){
+  if(!input.files[0])return;
+  const prev=document.getElementById('imgPreview');
+  prev.innerHTML='';
+  const img=document.createElement('img');
+  img.src=URL.createObjectURL(input.files[0]);
+  prev.appendChild(img);
+}
+
 function step(id,st){
   const el=document.getElementById(id);
+  if(!el)return;
   el.classList.remove('active','done','err');
   if(st)el.classList.add(st);
   const si=el.querySelector('.si');
@@ -221,8 +290,6 @@ function step(id,st){
 }
 
 async function genScript(){
-  const antKey=document.getElementById('antKey').value.trim();
-  if(!antKey){alert('خاصك تدخل Anthropic API Key');return;}
   const btn=document.getElementById('genSBtn');
   btn.disabled=true;btn.textContent='⏳ جاري التوليد...';
   try{
@@ -236,62 +303,173 @@ async function genScript(){
         market:document.getElementById('market').value,
         dialect:document.getElementById('dialect').value,
         duration:document.getElementById('dur').value,
-        type:selT,
-        antKey:antKey
+        type:selT
       })
     });
     const data=await res.json();
     if(data.error)throw new Error(data.error);
     document.getElementById('scriptT').value=data.script;
-  }catch(e){alert('خطأ: '+e.message);}
+  }catch(e){alert('خطأ السكريبت: '+e.message);}
   btn.disabled=false;btn.textContent='✨ توليد سكريبت جديد';
 }
 
 async function genAudio(script){
   const key=document.getElementById('elKey').value.trim();
   if(!key)throw new Error('خاصك تدخل ElevenLabs API Key');
-  const vId=document.getElementById('voice').value;
-  const model=document.getElementById('vModel').value;
-  const res=await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${vId}`,{
+  const res=await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${document.getElementById('voice').value}`,{
     method:'POST',
     headers:{'xi-api-key':key,'Content-Type':'application/json','Accept':'audio/mpeg'},
-    body:JSON.stringify({text:script,model_id:model,voice_settings:{stability:.5,similarity_boost:.78,style:.3,use_speaker_boost:true}})
+    body:JSON.stringify({text:script,model_id:document.getElementById('vModel').value,voice_settings:{stability:.5,similarity_boost:.78,style:.3,use_speaker_boost:true}})
   });
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error('ElevenLabs: '+(e.detail?.message||res.status));}
-  const buf=await res.arrayBuffer();
-  return new Blob([buf],{type:'audio/mpeg'});
+  return new Blob([await res.arrayBuffer()],{type:'audio/mpeg'});
 }
 
-async function runAll(){
+async function submitVideo(prompt, duration, imageUrl){
+  const body={prompt, duration};
+  if(imageUrl)body.image_url=imageUrl;
+  const res=await fetch('/api/video',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  const data=await res.json();
+  if(data.error)throw new Error(data.error);
+  return data.task_id;
+}
+
+async function pollVideo(taskId, cardEl){
+  const statusEl=cardEl.querySelector('.vid-status');
+  for(let i=0;i<60;i++){
+    await new Promise(r=>setTimeout(r,5000));
+    const res=await fetch(`/api/video/status/${taskId}`);
+    const data=await res.json();
+    if(data.status==='done'&&data.url){
+      statusEl.textContent='✅ جاهز';
+      statusEl.className='vid-status done';
+      const vid=document.createElement('video');
+      vid.src=data.url;
+      vid.controls=true;
+      vid.style='width:100%;border-radius:8px;margin-top:8px';
+      cardEl.appendChild(vid);
+      const dl=document.createElement('a');
+      dl.href=data.url;
+      dl.download='mivax_clip_'+Date.now()+'.mp4';
+      dl.className='db p';
+      dl.style='margin-top:8px;width:100%;justify-content:center';
+      dl.textContent='⬇️ تحميل المقطع';
+      dl.target='_blank';
+      cardEl.appendChild(dl);
+      return true;
+    }else if(data.status==='failed'){
+      statusEl.textContent='❌ فشل التوليد';
+      statusEl.className='vid-status err';
+      return false;
+    }else{
+      const mins=Math.floor(i*5/60);
+      const secs=(i*5)%60;
+      statusEl.textContent=`⏳ جاري التوليد... ${mins}:${secs.toString().padStart(2,'0')}`;
+    }
+  }
+  statusEl.textContent='⏰ انتهى الوقت — جرب لاحقاً';
+  statusEl.className='vid-status err';
+  return false;
+}
+
+async function runAudioOnly(){
   const script=document.getElementById('scriptT').value.trim();
-  if(!script){alert('السكريبت فارغ — ولّده أو اكتبه يدوياً');return;}
+  if(!script){alert('السكريبت فارغ');return;}
   if(!document.getElementById('elKey').value.trim()){alert('خاصك تدخل ElevenLabs API Key');return;}
-  const btn=document.getElementById('mainBtn');
+  const btn=document.getElementById('audioOnlyBtn');
   btn.disabled=true;btn.textContent='⏳ جاري التوليد...';
-  document.getElementById('prog').classList.add('show');
-  document.getElementById('res').classList.remove('show');
-  ['s1','s2','s3'].forEach(s=>step(s,''));
   try{
-    step('s1','active');
     const aBlob=await genAudio(script);
-    step('s1','done');
-    step('s2','active');
     const aUrl=URL.createObjectURL(aBlob);
     document.getElementById('aEl').src=aUrl;
     document.getElementById('aEl').load();
     document.getElementById('aDl').href=aUrl;
-    document.getElementById('aDl').download='mivax_'+document.getElementById('pName').value.replace(/\s+/g,'_')+'_'+Date.now()+'.mp3';
-    step('s2','done');
-    step('s3','done');
+    document.getElementById('aDl').download='mivax_'+Date.now()+'.mp3';
     document.getElementById('sDis').textContent=script;
     document.getElementById('res').classList.add('show');
+    document.getElementById('videoRes').style.display='none';
+  }catch(e){alert('❌ خطأ: '+e.message);}
+  btn.disabled=false;btn.textContent='🎵 توليد الصوت فقط';
+}
+
+async function runAll(){
+  const script=document.getElementById('scriptT').value.trim();
+  if(!script){alert('السكريبت فارغ — ولّده أولاً');return;}
+  if(!document.getElementById('elKey').value.trim()){alert('خاصك تدخل ElevenLabs API Key');return;}
+
+  const prompts=Array.from(document.querySelectorAll('.vprompt')).map(i=>i.value.trim()).filter(Boolean);
+  const durations=Array.from(document.querySelectorAll('.vdur')).map(s=>s.value);
+
+  const btn=document.getElementById('mainBtn');
+  btn.disabled=true;btn.textContent='⏳ جاري التوليد...';
+  document.getElementById('prog').classList.add('show');
+  document.getElementById('res').classList.remove('show');
+  ['s1','s2','s3','s4'].forEach(s=>step(s,''));
+
+  try{
+    // Step 1: Audio
+    step('s1','active');
+    const aBlob=await genAudio(script);
+    const aUrl=URL.createObjectURL(aBlob);
+    document.getElementById('aEl').src=aUrl;
+    document.getElementById('aEl').load();
+    document.getElementById('aDl').href=aUrl;
+    document.getElementById('aDl').download='mivax_audio_'+Date.now()+'.mp3';
+    step('s1','done');
+
+    // Step 2: Submit videos
+    if(prompts.length>0){
+      step('s2','active');
+      const imgUrl=document.getElementById('imgUrl').value.trim();
+      const grid=document.getElementById('vidGrid');
+      grid.innerHTML='';
+      const taskIds=[];
+
+      for(let i=0;i<prompts.length;i++){
+        const card=document.createElement('div');
+        card.className='vid-card';
+        card.innerHTML=`<p style="font-size:.82rem;color:var(--mut);margin-bottom:6px">مشهد ${i+1}</p><div class="vid-status">⏳ جاري الإرسال...</div>`;
+        grid.appendChild(card);
+        try{
+          const tid=await submitVideo(prompts[i], durations[i]||'5', imgUrl);
+          taskIds.push({tid, card});
+          card.querySelector('.vid-status').textContent='✅ تم الإرسال — جاري التوليد...';
+        }catch(e){
+          card.querySelector('.vid-status').textContent='❌ '+e.message;
+          card.querySelector('.vid-status').className='vid-status err';
+          taskIds.push({tid:null, card});
+        }
+      }
+      step('s2','done');
+
+      // Step 3: Poll
+      step('s3','active');
+      document.getElementById('videoRes').style.display='block';
+      document.getElementById('sDis').textContent=script;
+      document.getElementById('res').classList.add('show');
+      await Promise.all(taskIds.filter(t=>t.tid).map(t=>pollVideo(t.tid, t.card)));
+      step('s3','done');
+    }else{
+      step('s2','done');
+      step('s3','done');
+      document.getElementById('videoRes').style.display='none';
+    }
+
+    step('s4','done');
+    document.getElementById('sDis').textContent=script;
+    document.getElementById('res').classList.add('show');
+
   }catch(e){
-    ['s1','s2','s3'].forEach(s=>{
+    ['s1','s2','s3','s4'].forEach(s=>{
       if(document.getElementById(s).classList.contains('active'))step(s,'err');
     });
     alert('❌ خطأ: '+e.message);
   }
-  btn.disabled=false;btn.textContent='🎵 توليد صوت جديد';
+  btn.disabled=false;btn.textContent='🚀 توليد جديد';
 }
 
 function copyS(){
