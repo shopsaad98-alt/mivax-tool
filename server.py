@@ -119,6 +119,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", len(content))
             self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+            self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
             self.end_headers()
             self.wfile.write(content)
         except FileNotFoundError:
