@@ -4,10 +4,24 @@ import urllib.request
 import urllib.error
 import ssl
 import os
+import time
+import hmac
+import hashlib
+import base64
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY", "")
+KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY", "")
 PORT = int(os.environ.get("PORT", 8000))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def generate_kling_token(access_key, secret_key):
+    now = int(time.time())
+    header = base64.urlsafe_b64encode(json.dumps({"alg":"HS256","typ":"JWT"}).encode()).rstrip(b'=').decode()
+    payload = base64.urlsafe_b64encode(json.dumps({"iss":access_key,"exp":now+1800,"nbf":now-5}).encode()).rstrip(b'=').decode()
+    msg = f"{header}.{payload}"
+    sig = base64.urlsafe_b64encode(hmac.new(secret_key.encode(), msg.encode(), hashlib.sha256).digest()).rstrip(b'=').decode()
+    return f"{msg}.{sig}"
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -25,17 +39,25 @@ class Handler(BaseHTTPRequestHandler):
             filepath = os.path.join(BASE_DIR, "index.html")
             self.serve_file(filepath, "text/html; charset=utf-8")
         elif self.path == "/health":
-            self.send_json({"status": "ok", "key_set": bool(ANTHROPIC_API_KEY)})
+            self.send_json({"status": "ok", "anthropic": bool(ANTHROPIC_API_KEY), "kling": bool(KLING_ACCESS_KEY)})
+        elif self.path.startswith("/api/video/status/"):
+            task_id = self.path.split("/")[-1]
+            self.check_video_status(task_id)
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        try:
+            data = json.loads(body)
+        except:
+            self.send_json({"error": "Invalid JSON"}, 400)
+            return
+
         if self.path == "/api/script":
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length)
             try:
-                data = json.loads(body)
                 api_key = data.get("antKey", "").strip() or ANTHROPIC_API_KEY
                 if not api_key:
                     self.send_json({"error": "Anthropic API Key غير موجود"}, 401)
@@ -43,8 +65,14 @@ class Handler(BaseHTTPRequestHandler):
                 script = self.generate_script(data, api_key)
                 self.send_json({"script": script})
             except urllib.error.HTTPError as e:
-                error_body = e.read().decode()
-                self.send_json({"error": f"Anthropic API Error {e.code}: {error_body}"}, 500)
+                self.send_json({"error": f"Anthropic Error {e.code}: {e.read().decode()}"}, 500)
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
+
+        elif self.path == "/api/video":
+            try:
+                result = self.generate_video(data)
+                self.send_json(result)
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)
         else:
@@ -68,25 +96,14 @@ class Handler(BaseHTTPRequestHandler):
         }
         dur = data.get("duration", "30")
         words = "60-75 كلمة" if dur == "15" else "120-145 كلمة"
-        dialect = data.get("dialect", "gulf")
-        vtype = data.get("type", "ugc")
-
-        prompt = f"""اكتب سكريبت فيديو إعلاني بـ{dialect_map.get(dialect, 'الخليجية')} للمنتج:
-
+        prompt = f"""اكتب سكريبت فيديو إعلاني بـ{dialect_map.get(data.get('dialect','gulf'), 'الخليجية')} للمنتج:
 المنتج: {data.get('product', '')}
 الوصف: {data.get('description', '')}
 العرض: {data.get('offer', '')}
 السوق: {data.get('market', 'KSA')}
-نوع الفيديو: {type_map.get(vtype, '')}
+نوع الفيديو: {type_map.get(data.get('type','ugc'), '')}
 المدة: {dur} ثانية ({words})
-
-قواعد صارمة:
-1. Hook قوي في أول جملة يوقف التمرير
-2. اللهجة طبيعية وأصيلة 100%
-3. لا مقدمات — كل جملة لها هدف
-4. أرقام وتفاصيل ملموسة تزيد المصداقية
-5. CTA واضح في الآخر
-6. السكريبت فقط جاهز للقراءة بدون أي عناوين أو تعليقات"""
+قواعد: Hook قوي، لهجة طبيعية، لا مقدمات، CTA واضح في الآخر. السكريبت فقط بدون عناوين."""
 
         req_data = json.dumps({
             "model": "claude-haiku-4-5-20251001",
@@ -94,22 +111,101 @@ class Handler(BaseHTTPRequestHandler):
             "messages": [{"role": "user", "content": prompt}]
         }).encode()
 
-        # SSL context للسيرفر
         ctx = ssl.create_default_context()
-
         req = urllib.request.Request(
             "https://api.anthropic.com/v1/messages",
             data=req_data,
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01"
-            },
+            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
+            return json.loads(resp.read())["content"][0]["text"]
+
+    def generate_video(self, data):
+        if not KLING_ACCESS_KEY or not KLING_SECRET_KEY:
+            raise Exception("Kling API Keys غير موجودة في السيرفر")
+
+        token = generate_kling_token(KLING_ACCESS_KEY, KLING_SECRET_KEY)
+        prompt = data.get("prompt", "")
+        image_url = data.get("image_url", "")
+        duration = data.get("duration", "5")
+
+        if image_url:
+            body = json.dumps({
+                "model_name": "kling-v1",
+                "image": image_url,
+                "prompt": prompt,
+                "duration": duration,
+                "aspect_ratio": "9:16",
+                "mode": "std"
+            }).encode()
+            url = "https://api.klingai.com/v1/videos/image2video"
+        else:
+            body = json.dumps({
+                "model_name": "kling-v1",
+                "prompt": prompt,
+                "duration": duration,
+                "aspect_ratio": "9:16",
+                "mode": "std"
+            }).encode()
+            url = "https://api.klingai.com/v1/videos/text2video"
+
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
             result = json.loads(resp.read())
-            return result["content"][0]["text"]
+
+        if result.get("code") != 0:
+            raise Exception(f"Kling Error: {result.get('message', 'Unknown error')}")
+
+        task_id = result["data"]["task_id"]
+        return {"task_id": task_id, "status": "submitted"}
+
+    def check_video_status(self, task_id):
+        try:
+            if not KLING_ACCESS_KEY or not KLING_SECRET_KEY:
+                self.send_json({"error": "Kling keys missing"}, 500)
+                return
+
+            token = generate_kling_token(KLING_ACCESS_KEY, KLING_SECRET_KEY)
+            ctx = ssl.create_default_context()
+
+            # Try image2video first, then text2video
+            for endpoint in ["image2video", "text2video"]:
+                url = f"https://api.klingai.com/v1/videos/{endpoint}/{task_id}"
+                try:
+                    req = urllib.request.Request(
+                        url,
+                        headers={"Authorization": f"Bearer {token}"},
+                        method="GET"
+                    )
+                    with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+                        result = json.loads(resp.read())
+                        if result.get("code") == 0:
+                            task_data = result["data"]
+                            status = task_data.get("task_status", "")
+                            if status == "succeed":
+                                videos = task_data.get("task_result", {}).get("videos", [])
+                                if videos:
+                                    self.send_json({"status": "done", "url": videos[0]["url"]})
+                                    return
+                            elif status == "failed":
+                                self.send_json({"status": "failed", "error": task_data.get("task_status_msg", "Failed")})
+                                return
+                            else:
+                                self.send_json({"status": "processing"})
+                                return
+                except:
+                    continue
+
+            self.send_json({"status": "processing"})
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
 
     def serve_file(self, filepath, ctype):
         try:
@@ -140,6 +236,4 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"Server running on port {PORT}")
-    print(f"Base dir: {BASE_DIR}")
-    print(f"API key set: {bool(ANTHROPIC_API_KEY)}")
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
