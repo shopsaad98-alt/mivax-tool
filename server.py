@@ -6,6 +6,9 @@ import os
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 PORT = int(os.environ.get("PORT", 8000))
 
+# مسار الملفات
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
@@ -19,7 +22,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/" or self.path == "/index.html":
-            self.serve_file("index.html", "text/html; charset=utf-8")
+            filepath = os.path.join(BASE_DIR, "index.html")
+            self.serve_file(filepath, "text/html; charset=utf-8")
         elif self.path == "/health":
             self.send_json({"status": "ok", "key_set": bool(ANTHROPIC_API_KEY)})
         else:
@@ -32,7 +36,6 @@ class Handler(BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             try:
                 data = json.loads(body)
-                # استعمل المفتاح من الـ request إذا موجود، وإلا من Environment
                 api_key = data.get("antKey", "").strip() or ANTHROPIC_API_KEY
                 if not api_key:
                     self.send_json({"error": "Anthropic API Key غير موجود"}, 401)
@@ -102,9 +105,9 @@ class Handler(BaseHTTPRequestHandler):
             result = json.loads(resp.read())
             return result["content"][0]["text"]
 
-    def serve_file(self, filename, ctype):
+    def serve_file(self, filepath, ctype):
         try:
-            with open(filename, "rb") as f:
+            with open(filepath, "rb") as f:
                 content = f.read()
             self.send_response(200)
             self.send_header("Content-Type", ctype)
@@ -114,7 +117,9 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(content)
         except FileNotFoundError:
             self.send_response(404)
+            self.send_header("Content-Type", "text/plain")
             self.end_headers()
+            self.wfile.write(b"File not found: " + filepath.encode())
 
     def send_json(self, data, code=200):
         body = json.dumps(data, ensure_ascii=False).encode()
@@ -127,4 +132,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"Server running on port {PORT}")
+    print(f"Base dir: {BASE_DIR}")
+    print(f"API key set: {bool(ANTHROPIC_API_KEY)}")
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
