@@ -1,12 +1,12 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import urllib.request
+import urllib.error
+import ssl
 import os
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 PORT = int(os.environ.get("PORT", 8000))
-
-# مسار الملفات
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class Handler(BaseHTTPRequestHandler):
@@ -42,6 +42,9 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 script = self.generate_script(data, api_key)
                 self.send_json({"script": script})
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode()
+                self.send_json({"error": f"Anthropic API Error {e.code}: {error_body}"}, 500)
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)
         else:
@@ -91,6 +94,9 @@ class Handler(BaseHTTPRequestHandler):
             "messages": [{"role": "user", "content": prompt}]
         }).encode()
 
+        # SSL context للسيرفر
+        ctx = ssl.create_default_context()
+
         req = urllib.request.Request(
             "https://api.anthropic.com/v1/messages",
             data=req_data,
@@ -101,7 +107,7 @@ class Handler(BaseHTTPRequestHandler):
             },
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
             result = json.loads(resp.read())
             return result["content"][0]["text"]
 
@@ -119,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
-            self.wfile.write(b"File not found: " + filepath.encode())
+            self.wfile.write(b"404 Not Found")
 
     def send_json(self, data, code=200):
         body = json.dumps(data, ensure_ascii=False).encode()
@@ -135,3 +141,4 @@ if __name__ == "__main__":
     print(f"Base dir: {BASE_DIR}")
     print(f"API key set: {bool(ANTHROPIC_API_KEY)}")
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+
