@@ -9,9 +9,9 @@ import hmac
 import hashlib
 import base64
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY", "")
-KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY", "").strip()
+KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY", "").strip()
 PORT = int(os.environ.get("PORT", 8000))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -112,10 +112,11 @@ class Handler(BaseHTTPRequestHandler):
         }).encode()
 
         ctx = ssl.create_default_context()
+        clean_key = api_key.strip().replace('\n', '').replace('\r', '')
         req = urllib.request.Request(
             "https://api.anthropic.com/v1/messages",
             data=req_data,
-            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+            headers={"Content-Type": "application/json", "x-api-key": clean_key, "anthropic-version": "2023-06-01"},
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
