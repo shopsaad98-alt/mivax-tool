@@ -1,318 +1,191 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import json
-import urllib.request
-import urllib.error
-import ssl
-import os
-import time
-import hmac
-import hashlib
-import base64
+import json, urllib.request, urllib.error, ssl, os, time, hmac, hashlib, base64
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY", "").strip()
-KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY", "").strip()
-IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY", "").strip()
+KLING_ACCESS_KEY  = os.environ.get("KLING_ACCESS_KEY",  "").strip()
+KLING_SECRET_KEY  = os.environ.get("KLING_SECRET_KEY",  "").strip()
+IMGBB_API_KEY     = os.environ.get("IMGBB_API_KEY",     "").strip()
 PORT = int(os.environ.get("PORT", 8000))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def generate_kling_token(access_key, secret_key):
+def kling_token():
     now = int(time.time())
-    header = base64.urlsafe_b64encode(json.dumps({"alg":"HS256","typ":"JWT"}).encode()).rstrip(b'=').decode()
-    payload = base64.urlsafe_b64encode(json.dumps({"iss":access_key,"exp":now+1800,"nbf":now-5}).encode()).rstrip(b'=').decode()
-    msg = f"{header}.{payload}"
-    sig = base64.urlsafe_b64encode(hmac.new(secret_key.encode(), msg.encode(), hashlib.sha256).digest()).rstrip(b'=').decode()
+    h = base64.urlsafe_b64encode(json.dumps({"alg":"HS256","typ":"JWT"}).encode()).rstrip(b'=').decode()
+    p = base64.urlsafe_b64encode(json.dumps({"iss":KLING_ACCESS_KEY,"exp":now+1800,"nbf":now-5}).encode()).rstrip(b'=').decode()
+    msg = f"{h}.{p}"
+    sig = base64.urlsafe_b64encode(hmac.new(KLING_SECRET_KEY.encode(), msg.encode(), hashlib.sha256).digest()).rstrip(b'=').decode()
     return f"{msg}.{sig}"
 
 class Handler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        pass
+    def log_message(self, fmt, *a): pass
+
+    def cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST,GET,OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
+        self.send_response(200); self.cors(); self.end_headers()
 
     def do_GET(self):
-        if self.path == "/" or self.path == "/index.html":
-            filepath = os.path.join(BASE_DIR, "index.html")
-            self.serve_file(filepath, "text/html; charset=utf-8")
+        if self.path in ("/", "/index.html"):
+            self.serve_file(os.path.join(BASE_DIR, "index.html"), "text/html; charset=utf-8")
         elif self.path == "/health":
-            self.send_json({"status": "ok", "anthropic": bool(ANTHROPIC_API_KEY), "kling": bool(KLING_ACCESS_KEY), "imgbb": bool(IMGBB_API_KEY)})
+            self.json({"status":"ok","anthropic":bool(ANTHROPIC_API_KEY),"kling":bool(KLING_ACCESS_KEY),"imgbb":bool(IMGBB_API_KEY)})
         elif self.path.startswith("/api/video/status/"):
-            task_id = self.path.split("/")[-1]
-            self.check_video_status(task_id)
+            self.video_status(self.path.split("/")[-1])
         else:
-            self.send_response(404)
-            self.end_headers()
+            self.send_response(404); self.end_headers()
 
     def do_POST(self):
-        length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length)
+        n = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(n)
 
-        # Handle image upload (multipart)
         if self.path == "/api/upload":
-            try:
-                result = self.upload_image(body, self.headers)
-                self.send_json(result)
-            except Exception as e:
-                self.send_json({"error": str(e)}, 500)
+            try: self.json(self.upload_img(body, self.headers))
+            except Exception as e: self.json({"error": str(e)}, 500)
             return
 
-        try:
-            data = json.loads(body)
-        except:
-            self.send_json({"error": "Invalid JSON"}, 400)
-            return
+        try: data = json.loads(body)
+        except: self.json({"error":"bad json"}, 400); return
 
         if self.path == "/api/script":
             try:
-                api_key = data.get("antKey", "").strip() or ANTHROPIC_API_KEY
-                if not api_key:
-                    self.send_json({"error": "Anthropic API Key غير موجود"}, 401)
-                    return
-                script = self.generate_script(data, api_key)
-                self.send_json({"script": script})
+                key = data.get("antKey","").strip() or ANTHROPIC_API_KEY
+                if not key: self.json({"error":"no anthropic key"},401); return
+                self.json({"script": self.gen_script(data, key)})
             except urllib.error.HTTPError as e:
-                self.send_json({"error": f"Anthropic Error {e.code}: {e.read().decode()}"}, 500)
+                self.json({"error": f"Anthropic {e.code}: {e.read().decode()}"}, 500)
             except Exception as e:
-                self.send_json({"error": str(e)}, 500)
+                self.json({"error": str(e)}, 500)
 
         elif self.path == "/api/video":
-            try:
-                result = self.generate_video(data)
-                self.send_json(result)
-            except Exception as e:
-                self.send_json({"error": str(e)}, 500)
+            try: self.json(self.submit_video(data))
+            except Exception as e: self.json({"error": str(e)}, 500)
         else:
-            self.send_response(404)
-            self.end_headers()
+            self.send_response(404); self.end_headers()
 
-    def upload_image(self, body, headers):
-        if not IMGBB_API_KEY:
-            raise Exception("IMGBB_API_KEY غير موجود")
-
-        import email.parser
-        content_type = headers.get("Content-Type", "")
-
-        # Extract boundary
-        boundary = None
-        for part in content_type.split(";"):
-            part = part.strip()
-            if part.startswith("boundary="):
-                boundary = part[9:].strip('"')
-                break
-
-        if not boundary:
-            raise Exception("No boundary in multipart")
-
-        # Parse multipart manually
-        boundary_bytes = ("--" + boundary).encode()
-        parts = body.split(boundary_bytes)
-        image_data = None
-
-        for part in parts:
-            if b"Content-Disposition" in part and b"filename" in part:
-                # Split headers from body
-                if b"
-
-" in part:
-                    _, file_content = part.split(b"
-
-", 1)
-                    file_content = file_content.rstrip(b"
---")
-                    image_data = file_content
-                    break
-
-        if not image_data:
-            raise Exception("No image found in request")
-
-        # Upload to ImgBB
+    def upload_img(self, body, headers):
         import urllib.parse
-        b64 = base64.b64encode(image_data).decode()
-
-        post_data = urllib.parse.urlencode({
-            "key": IMGBB_API_KEY,
-            "image": b64
-        }).encode()
-
+        ct = headers.get("Content-Type","")
+        boundary = None
+        for part in ct.split(";"):
+            p = part.strip()
+            if p.startswith("boundary="):
+                boundary = p[9:].strip('"')
+        if not boundary:
+            raise Exception("no boundary")
+        sep = ("--" + boundary).encode()
+        parts = body.split(sep)
+        img_data = None
+        for part in parts:
+            if b"filename" in part:
+                idx = part.find(b"\r\n\r\n")
+                if idx != -1:
+                    img_data = part[idx+4:].rstrip(b"\r\n--")
+                    break
+        if not img_data:
+            raise Exception("no image")
+        b64 = base64.b64encode(img_data).decode()
+        post = urllib.parse.urlencode({"key": IMGBB_API_KEY, "image": b64}).encode()
         ctx = ssl.create_default_context()
-        req = urllib.request.Request(
-            "https://api.imgbb.com/1/upload",
-            data=post_data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            method="POST"
-        )
+        req = urllib.request.Request("https://api.imgbb.com/1/upload", data=post,
+              headers={"Content-Type":"application/x-www-form-urlencoded"}, method="POST")
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as r:
+            res = json.loads(r.read())
+        if res.get("success"):
+            return {"url": res["data"]["url"]}
+        raise Exception("imgbb failed")
 
-        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
-            result = json.loads(resp.read())
-
-        if result.get("success"):
-            return {"url": result["data"]["url"]}
-        else:
-            raise Exception("ImgBB upload failed")
-
-    def generate_script(self, data, api_key):
-        dialect_map = {
-            "gulf": "اللهجة الخليجية السعودية الأصيلة",
-            "moroccan": "الدارجة المغربية العامية",
-            "egyptian": "اللهجة المصرية العامية",
-            "iraqi": "اللهجة العراقية العامية"
-        }
-        type_map = {
-            "ugc": "شهادة UGC كأن عميلة حقيقية تحكي تجربتها",
-            "pain": "ابدأ بالمشكلة والألم ثم قدم المنتج كحل",
-            "hook": "hook صادم يوقف التمرير في أول ثانيتين",
-            "before": "قبل وبعد — تباين حياة الشخص قبل وبعد المنتج",
-            "product": "عرض مزايا المنتج بشكل جذاب",
-            "urgency": "إلحاح وندرة — العرض محدود اطلب الآن"
-        }
-        dur = data.get("duration", "30")
-        words = "60-75 كلمة" if dur == "15" else "120-145 كلمة"
-        prompt = f"""اكتب سكريبت فيديو إعلاني بـ{dialect_map.get(data.get('dialect','gulf'), 'الخليجية')} للمنتج:
-المنتج: {data.get('product', '')}
-الوصف: {data.get('description', '')}
-العرض: {data.get('offer', '')}
-السوق: {data.get('market', 'KSA')}
-نوع الفيديو: {type_map.get(data.get('type','ugc'), '')}
+    def gen_script(self, data, api_key):
+        dm = {"gulf":"اللهجة الخليجية السعودية الأصيلة","moroccan":"الدارجة المغربية العامية","egyptian":"اللهجة المصرية العامية","iraqi":"اللهجة العراقية العامية"}
+        tm = {"ugc":"شهادة UGC","pain":"مشكلة/حل","hook":"hook صادم","before":"قبل/بعد","product":"عرض منتج","urgency":"إلحاح"}
+        dur = data.get("duration","30")
+        words = "60-75 كلمة" if dur=="15" else "120-145 كلمة"
+        prompt = f"""اكتب سكريبت فيديو إعلاني بـ{dm.get(data.get('dialect','gulf'),'الخليجية')} للمنتج:
+المنتج: {data.get('product','')}
+الوصف: {data.get('description','')}
+العرض: {data.get('offer','')}
+السوق: {data.get('market','KSA')}
+نوع: {tm.get(data.get('type','ugc'),'')}
 المدة: {dur} ثانية ({words})
-قواعد: Hook قوي، لهجة طبيعية، لا مقدمات، CTA واضح في الآخر. السكريبت فقط بدون عناوين."""
-
-        req_data = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 1000,
-            "messages": [{"role": "user", "content": prompt}]
-        }).encode()
-
+قواعد: Hook قوي، لهجة طبيعية، لا مقدمات، CTA واضح. السكريبت فقط."""
+        body = json.dumps({"model":"claude-haiku-4-5-20251001","max_tokens":1000,"messages":[{"role":"user","content":prompt}]}).encode()
+        clean = api_key.strip().replace("\n","").replace("\r","")
         ctx = ssl.create_default_context()
-        clean_key = api_key.strip().replace('\n', '').replace('\r', '')
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=req_data,
-            headers={"Content-Type": "application/json", "x-api-key": clean_key, "anthropic-version": "2023-06-01"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
-            return json.loads(resp.read())["content"][0]["text"]
+        req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=body,
+              headers={"Content-Type":"application/json","x-api-key":clean,"anthropic-version":"2023-06-01"}, method="POST")
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as r:
+            return json.loads(r.read())["content"][0]["text"]
 
-    def generate_video(self, data):
-        if not KLING_ACCESS_KEY or not KLING_SECRET_KEY:
-            raise Exception("Kling API Keys غير موجودة في السيرفر")
-
-        token = generate_kling_token(KLING_ACCESS_KEY, KLING_SECRET_KEY)
-        prompt = data.get("prompt", "")
-        image_url = data.get("image_url", "")
-        duration = data.get("duration", "5")
-
-        aspect_ratio = data.get("aspect_ratio", "9:16")
-
+    def submit_video(self, data):
+        if not KLING_ACCESS_KEY: raise Exception("no kling keys")
+        token = kling_token()
+        prompt = data.get("prompt","")
+        image_url = data.get("image_url","")
+        duration = data.get("duration","5")
+        aspect = data.get("aspect_ratio","9:16")
+        ctx = ssl.create_default_context()
         if image_url:
-            body = json.dumps({
-                "model_name": "kling-v1",
-                "image": image_url,
-                "prompt": prompt,
-                "duration": duration,
-                "aspect_ratio": aspect_ratio,
-                "mode": "std"
-            }).encode()
+            payload = {"model_name":"kling-v1","image":image_url,"prompt":prompt,"duration":duration,"aspect_ratio":aspect,"mode":"std"}
             url = "https://api-singapore.klingai.com/v1/videos/image2video"
         else:
-            body = json.dumps({
-                "model_name": "kling-v1",
-                "prompt": prompt,
-                "duration": duration,
-                "aspect_ratio": aspect_ratio,
-                "mode": "std"
-            }).encode()
+            payload = {"model_name":"kling-v1","prompt":prompt,"duration":duration,"aspect_ratio":aspect,"mode":"std"}
             url = "https://api-singapore.klingai.com/v1/videos/text2video"
+        body = json.dumps(payload).encode()
+        req = urllib.request.Request(url, data=body,
+              headers={"Content-Type":"application/json","Authorization":f"Bearer {token}"}, method="POST")
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as r:
+            res = json.loads(r.read())
+        if res.get("code") != 0: raise Exception(f"Kling: {res.get('message','error')}")
+        return {"task_id": res["data"]["task_id"], "status":"submitted"}
 
-        ctx = ssl.create_default_context()
-        req = urllib.request.Request(
-            url,
-            data=body,
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
-            result = json.loads(resp.read())
-
-        if result.get("code") != 0:
-            raise Exception(f"Kling Error: {result.get('message', 'Unknown error')}")
-
-        task_id = result["data"]["task_id"]
-        return {"task_id": task_id, "status": "submitted"}
-
-    def check_video_status(self, task_id):
+    def video_status(self, task_id):
         try:
-            if not KLING_ACCESS_KEY or not KLING_SECRET_KEY:
-                self.send_json({"error": "Kling keys missing"}, 500)
-                return
-
-            token = generate_kling_token(KLING_ACCESS_KEY, KLING_SECRET_KEY)
+            token = kling_token()
             ctx = ssl.create_default_context()
-
-            # Try image2video first, then text2video
-            for endpoint in ["image2video", "text2video"]:
-                url = f"https://api-singapore.klingai.com/v1/videos/{endpoint}/{task_id}"
+            for ep in ["image2video","text2video"]:
+                url = f"https://api-singapore.klingai.com/v1/videos/{ep}/{task_id}"
                 try:
-                    req = urllib.request.Request(
-                        url,
-                        headers={"Authorization": f"Bearer {token}"},
-                        method="GET"
-                    )
-                    with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
-                        result = json.loads(resp.read())
-                        if result.get("code") == 0:
-                            task_data = result["data"]
-                            status = task_data.get("task_status", "")
-                            if status == "succeed":
-                                videos = task_data.get("task_result", {}).get("videos", [])
-                                if videos:
-                                    self.send_json({"status": "done", "url": videos[0]["url"]})
-                                    return
-                            elif status == "failed":
-                                self.send_json({"status": "failed", "error": task_data.get("task_status_msg", "Failed")})
-                                return
-                            else:
-                                self.send_json({"status": "processing"})
-                                return
-                except:
-                    continue
-
-            self.send_json({"status": "processing"})
+                    req = urllib.request.Request(url, headers={"Authorization":f"Bearer {token}"}, method="GET")
+                    with urllib.request.urlopen(req, timeout=15, context=ctx) as r:
+                        res = json.loads(r.read())
+                    if res.get("code") == 0:
+                        d = res["data"]
+                        st = d.get("task_status","")
+                        if st == "succeed":
+                            vids = d.get("task_result",{}).get("videos",[])
+                            if vids: self.json({"status":"done","url":vids[0]["url"]}); return
+                        elif st == "failed":
+                            self.json({"status":"failed","error":d.get("task_status_msg","failed")}); return
+                        else:
+                            self.json({"status":"processing"}); return
+                except: continue
+            self.json({"status":"processing"})
         except Exception as e:
-            self.send_json({"error": str(e)}, 500)
+            self.json({"error":str(e)}, 500)
 
-    def serve_file(self, filepath, ctype):
+    def serve_file(self, path, ct):
         try:
-            with open(filepath, "rb") as f:
-                content = f.read()
+            with open(path, "rb") as f: content = f.read()
             self.send_response(200)
-            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Type", ct)
             self.send_header("Content-Length", len(content))
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
-            self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+            self.cors()
             self.end_headers()
             self.wfile.write(content)
         except FileNotFoundError:
-            self.send_response(404)
-            self.send_header("Content-Type", "text/plain")
-            self.end_headers()
-            self.wfile.write(b"404 Not Found")
+            self.send_response(404); self.end_headers()
 
-    def send_json(self, data, code=200):
+    def json(self, data, code=200):
         body = json.dumps(data, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", len(body))
+        self.cors()
         self.end_headers()
         self.wfile.write(body)
 
 if __name__ == "__main__":
-    print(f"Server running on port {PORT}")
+    print(f"Server on port {PORT}")
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
