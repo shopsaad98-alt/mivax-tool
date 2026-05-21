@@ -89,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
 6. السكريبت فقط جاهز للقراءة بدون أي عناوين أو تعليقات"""
 
         req_data = json.dumps({
-            "model": "claude-3-5-sonnet-20241022",
+            "model": "claude-haiku-4-5-20251001",
             "max_tokens": 1000,
             "messages": [{"role": "user", "content": prompt}]
         }).encode()
