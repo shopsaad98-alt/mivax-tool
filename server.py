@@ -1,7 +1,6 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import urllib.request
-import urllib.error
 import os
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -14,7 +13,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
@@ -22,7 +21,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/" or self.path == "/index.html":
             self.serve_file("index.html", "text/html; charset=utf-8")
         elif self.path == "/health":
-            self.send_json({"status": "ok"})
+            self.send_json({"status": "ok", "key_set": bool(ANTHROPIC_API_KEY)})
         else:
             self.send_response(404)
             self.end_headers()
@@ -33,7 +32,12 @@ class Handler(BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             try:
                 data = json.loads(body)
-                script = self.generate_script(data)
+                # استعمل المفتاح من الـ request إذا موجود، وإلا من Environment
+                api_key = data.get("antKey", "").strip() or ANTHROPIC_API_KEY
+                if not api_key:
+                    self.send_json({"error": "Anthropic API Key غير موجود"}, 401)
+                    return
+                script = self.generate_script(data, api_key)
                 self.send_json({"script": script})
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)
@@ -41,7 +45,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def generate_script(self, data):
+    def generate_script(self, data, api_key):
         dialect_map = {
             "gulf": "اللهجة الخليجية السعودية الأصيلة",
             "moroccan": "الدارجة المغربية العامية",
@@ -89,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
             data=req_data,
             headers={
                 "Content-Type": "application/json",
-                "x-api-key": ANTHROPIC_API_KEY,
+                "x-api-key": api_key,
                 "anthropic-version": "2023-06-01"
             },
             method="POST"
