@@ -219,7 +219,7 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
 </div>
 
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js" crossorigin="anonymous"></script>
-<script>window.FFmpegUtil={toBlobURL:async function(url,mimeType){const r=await fetch(url);const b=await r.blob();return URL.createObjectURL(new Blob([await b.arrayBuffer()],{type:mimeType}));}}</script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js" crossorigin="anonymous"></script>
 <script>
 let selT='ugc', imgs=[], ffInst=null;
 
@@ -306,7 +306,6 @@ async function loadFF(){
   if(ffInst)return ffInst;
   flog('تحميل FFmpeg...');
   const{FFmpeg}=FFmpegWASM;
-  const{toBlobURL}=FFmpegUtil;
   ffInst=new FFmpeg();
   ffInst.on('log',({message})=>{
     if(message&&(message.includes('time=')||message.includes('frame='))){
@@ -317,6 +316,11 @@ async function loadFF(){
     }
   });
   const base='https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+  const toBlobURL=async(url,type)=>{
+    const r=await fetch(url,{credentials:'omit'});
+    const b=await r.blob();
+    return URL.createObjectURL(new Blob([await b.arrayBuffer()],{type}));
+  };
   await ffInst.load({
     coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
     wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm'),
