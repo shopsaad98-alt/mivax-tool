@@ -139,12 +139,21 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
     <div>
       <label>الصوت</label>
       <select id="voice">
-        <option value="21m00Tcm4TlvDq8ikWAM">Aria — نسائي خليجي دافئ</option>
-        <option value="EXAVITQu4vr4xnSDxMaL">Bella — نسائي ناعم</option>
-        <option value="AZnzlk1XvdvUeBnXmlld">Domi — شبابي نسائي</option>
-        <option value="TxGEqnHWrfWFTfGW9XjX">Josh — رجالي خليجي</option>
-        <option value="VR6AewLTigWG4xSOukaG">Arnold — رجالي قوي</option>
-        <option value="pNInz6obpgDQGcFmaJgB">Adam — رجالي موثوق</option>
+        <optgroup label="🇸🇦 خليجي / سعودي">
+          <option value="MI88rOZjXbH22N8KHXUo">Ali — رجالي سعودي عميق (UGC/إعلانات)</option>
+          <option value="IES4nrmZdUBHByLBde0P">Haytham — رجالي عربي دافئ (UGC/حوار)</option>
+          <option value="wxweiHvoC2r2jFM7mS8b">Haytham Storyteller — رجالي (VSL/قصص)</option>
+          <option value="UR972wNGq3zluze0LoIp">Haytham Narration — رجالي (إعلانات عامة)</option>
+        </optgroup>
+        <optgroup label="🌸 نسائي عربي">
+          <option value="L10lEremDiJfPicq5CPh">Yasmine — نسائي عربي طبيعي (UGC نسائي ⭐)</option>
+          <option value="9SPZl4Mlgwj7QT4gVprb">Arabic Female — نسائي سرد طبيعي</option>
+        </optgroup>
+        <optgroup label="🇪🇬 مصري">
+          <option value="LXrTqFIgiubkrMkwvOUr">Masry — رجالي مصري (شرح منتجات)</option>
+          <option value="DWMVT5WflKt0P8OPpIrY">Hanafi — رجالي مصري ثابت</option>
+          <option value="ocqVw6LVSdCxCra4XhMH">Abdullah Egyptian — رجالي احترافي</option>
+        </optgroup>
       </select>
     </div>
   </div>
@@ -161,6 +170,26 @@ footer{text-align:center;margin-top:40px;color:var(--mut);font-size:.8rem}
       <select id="vModel">
         <option value="eleven_multilingual_v2">Multilingual v2 (أفضل جودة)</option>
         <option value="eleven_flash_v2_5">Flash v2.5 (أسرع)</option>
+      </select>
+    </div>
+  </div>
+  <div class="r2">
+    <div>
+      <label>سرعة الكلام</label>
+      <select id="vSpeed">
+        <option value="0.8">بطيء (0.8x) — UGC طبيعي</option>
+        <option value="0.85" selected>طبيعي بطيء (0.85x) — موصى به</option>
+        <option value="1.0">عادي (1.0x)</option>
+        <option value="1.1">سريع قليلاً (1.1x)</option>
+      </select>
+    </div>
+    <div>
+      <label>نبرة الصوت (Style)</label>
+      <select id="vStyle">
+        <option value="0.2">هادئ ومحايد</option>
+        <option value="0.35" selected>طبيعي (موصى به)</option>
+        <option value="0.5">عاطفي / مقنع</option>
+        <option value="0.7">حماسي / إعلاني</option>
       </select>
     </div>
   </div>
@@ -366,7 +395,7 @@ async function genAudio(script){
   const res=await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${document.getElementById('voice').value}`,{
     method:'POST',
     headers:{'xi-api-key':key,'Content-Type':'application/json','Accept':'audio/mpeg'},
-    body:JSON.stringify({text:script,model_id:document.getElementById('vModel').value,voice_settings:{stability:.5,similarity_boost:.78,style:.3,use_speaker_boost:true}})
+    body:JSON.stringify({text:script,model_id:document.getElementById('vModel').value,voice_settings:{stability:.45,similarity_boost:.80,style:parseFloat(document.getElementById('vStyle').value),use_speaker_boost:true,speed:parseFloat(document.getElementById('vSpeed').value)}})
   });
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error('ElevenLabs: '+(e.detail?.message||res.status));}
   return new Blob([await res.arrayBuffer()],{type:'audio/mpeg'});
